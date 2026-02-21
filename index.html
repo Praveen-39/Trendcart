@@ -146,77 +146,40 @@
 
 <script>
 
-  const products = [
-  {
-    id:1,
-    name:" Brown Dress",
-    price:999,
-    img:"c://Users//LENOVO//Downloads//first.jpeg"
-  },
-  {
-    id:2,
-    name:"Casual Summer Dress",
-    price:899,
-    img:"c://Users//LENOVO//Downloads//second.jpeg"
-  },
-  {
-    id:3,
-    name:"Brown T-shirt",
-    price:499,
-    img:"c://Users//LENOVO//Downloads//third.jpeg"
-  },
-  {
-    id:4,
-    name:"Saree with Blouse",
-    price:1499,
-    img:"c://Users//LENOVO//Downloads//fourth.jpeg"
-  },
-  {
-    id:5,
-    name:"saree",
-    price:1599,
-    img:"c://Users//LENOVO//Downloads//fivth.jpeg"
-  },
-  {
-    id:6,
-    name:"girls's Shirt",
-    price:799,
-    img:"c://Users//LENOVO//Downloads//WhatsApp Image 2026-02-21 at 12.15.07 PM.jpeg"
-  },
-  {
-    id:7,
-    name:"frock",
-    price:999,
-    img:"c://Users//LENOVO//Downloads//WhatsApp Image 2026-02-21 at 12.23.22 PM.jpeg"
-  },
-  {
-    id:8,
-    name:"men's shirt",
-    price:899,
-    img:"c://Users//LENOVO//Downloads//WhatsApp Image 2026-02-21 at 12.14.50 PM.jpeg"
-  },
-  {
-    id:9,
-    name:"Brown Pant",
-    price:799,
-    img:"c://Users//LENOVO//Downloads//ninth.jpeg"
-  },
-  {
-    id:10,
-    name:"White t-shirt",
-    price:499,
-    img:"https://images.unsplash.com/photo-1521572163474-6864f9cf17ab"
-  },
-  
-];
+  // API Configuration
+  const API_URL = 'http://localhost:3000/api';
+  let products = [];
+  let currentProduct = null;
+
+  // Fetch products from backend
+  async function loadProductsFromAPI() {
+    try {
+      const response = await fetch(`${API_URL}/products`);
+      if (response.ok) {
+        products = await response.json();
+        console.log('✅ Loaded', products.length, 'products from database');
+      } else {
+        console.error('Failed to load products from API');
+        // Fallback to empty array
+        products = [];
+      }
+    } catch (error) {
+      console.error('Error connecting to backend:', error);
+      alert('⚠️ Cannot connect to backend server. Make sure it\'s running on port 3000');
+      products = [];
+    }
+  }
 
 
 //////////////////////////////////////////////////
 
-function enterStore(){
+async function enterStore(){
   const name=document.getElementById("name").value;
   if(name===""){ alert("Enter Name"); return; }
   localStorage.setItem("trendUser",name);
+  
+  // Load products from API
+  await loadProductsFromAPI();
   showMain();
 }
 
@@ -239,15 +202,20 @@ function showProducts(){
   const container=document.getElementById("productList");
   container.innerHTML="";
 
+  if(products.length === 0){
+    container.innerHTML = "<p>Loading products...</p>";
+    return;
+  }
+
   products.forEach(p=>{
     container.innerHTML+=`
       <div class="card">
-        <img src="${p.img}">
+        <img src="${p.image || p.img}" onerror="this.src='https://via.placeholder.com/200x250?text=No+Image'">
         <h3>${p.name}</h3>
         <p>₹${p.price}</p>
         <div class="btnRow">
-          <button onclick="buyNow()">Buy</button>
-          <button onclick="customize()">Customize</button>
+          <button onclick="buyNow('${p._id}')">Buy</button>
+          <button onclick="customize('${p._id}')">Customize</button>
         </div>
       </div>
     `;
@@ -256,12 +224,13 @@ function showProducts(){
 
 //////////////////////////////////////////////////
 
-function buyNow(){
+function buyNow(productId){
+  currentProduct = products.find(p => p._id === productId);
   document.getElementById("mainPage").style.display="none";
   document.getElementById("buyPage").style.display="block";
 }
 
-function goPayment(){
+async function goPayment(){
   const address=document.getElementById("address").value;
   const phone=document.getElementById("phone").value;
 
@@ -270,9 +239,38 @@ function goPayment(){
     return;
   }
 
-  document.getElementById("buyPage").style.display="none";
-  document.getElementById("paymentPage").style.display="block";
-}
+  // Save order to backend
+  try {
+    const orderData = {
+      userName: localStorage.getItem("trendUser"),
+      phone: phone,
+      address: address,
+      productId: currentProduct._id,
+      totalAmount: currentProduct.price,
+      quantity: 1
+    };
+
+    const response = await fetch(`${API_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData)
+    });
+
+    if (response.ok) {
+      const order = await response.json();
+      console.log('✅ Order placed:', order);
+      document.getElementById("buyPage").style.display="none";
+      document.getElementById("paymentPage").style.display="block";
+    } else {
+      alert('Failed to place order. Please try again.');
+    }
+  } catch (error) {
+    console.error('Error placing order:', error);
+    alert('Cannot connect to server. Order not saved.');
+    // Still show payment page for demo
+    document.getElementById("buyPage").style.display="none";
+    document.getElementById("paymentPage").style.display="block";
+  }
 
 function completeOrder(){
   alert("Payment Successful 🎉 Order Placed!");
@@ -281,7 +279,8 @@ function completeOrder(){
 
 //////////////////////////////////////////////////
 
-function customize(){
+function customize(productId){
+  currentProduct = products.find(p => p._id === productId);
   document.getElementById("mainPage").style.display="none";
   document.getElementById("customizePage").style.display="block";
 }
